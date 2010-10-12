@@ -147,7 +147,7 @@ def update():
             value = 2
         elif 50000 > clientes_monto[key]:
             value = 1
-        
+        clientes_monto[key] = value
         # Debugg
         if clientes_recencia[key] <= 2:
             continue
@@ -158,7 +158,7 @@ def update():
             if out != '' and out[0]=='s':
                 DEBUG = False
         
-        clientes_monto[key] = value
+        
     # -----------------  Calculo de Frecuencia  -----------------  
     # Reseteo DEBUG
     DEBUG = True

@@ -9,6 +9,17 @@ USER = 'rcastro'
 PASS = 'hometrix'
 DATABASE = 'sugarcrm'
 
+def ensure_dir(f):
+    # Obtengo la ruta de directorios
+    dirs = os.path.dirname(f)
+    
+    # Chequeo que la ruta exista
+    if not os.path.exists(dirs):
+        # Si no existe, la creo
+        print 'Creando path: ',dirs
+        os.makedirs(dirs)
+    return f
+
 def conectar(server=None, user=None, p=None, db=None):
     global SERVER, USER, DATABASE, PASS
     print 'Conectando a la base %s@%s  - Tabla: %s ...'%(SERVER,USER,DATABASE)
@@ -28,13 +39,18 @@ def procesar(pathname):
     
     # Archivos de log
     fecha = datetime.datetime.today().strftime("%Y%m%d-%H-%M")
-    error_file_name = open('./error/fecha-patentamiento-'+fecha+'.txt', 'w')
-    exito_file_name = open('./exito/fecha-patentamiento-'+fecha+'.txt', 'w')
+    error_file_name = open( ensure_dir('./error/fecha-patentamiento-'+fecha+'.txt'), 'w')
+    exito_file_name = open( ensure_dir('./exito/fecha-patentamiento-'+fecha+'.txt'), 'w')
     
     ventas_actualizadas = 0
     ventas_inexistentes = 0
     ventas_duplicadas = 0
+    iter = 0
     for linea in lineas:
+        iter += 1
+        print "Analizando dato %s de %s --> "%(iter, len(lineas))+str( float( iter/float(len(lineas))))+"%"
+        #if iter > 200:
+        #    break
         datos = linea.split(';')
         id_venta = int(datos[0])
         fecha_patentamiento = int(datos[1])
@@ -72,7 +88,7 @@ def procesar(pathname):
         
         # debug
         #print sql
-        continue
+        #continue
         
         try:
             cursor.execute(sql)
@@ -97,7 +113,7 @@ def procesar(pathname):
 if __name__ == '__main__':
     import sys
 
-    if len(sys.argv >= 2):
+    if len(sys.argv) >= 2:
         procesar(sys.argv[1])
     else:
         print "Error: Se requiere al menos un parametro. \nUSO: 'python update-fecha-patentamiento.py <archivo_input>'\n"
