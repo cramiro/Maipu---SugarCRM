@@ -29,9 +29,9 @@ def update():
     # Obtengo la fecha actual en formato ISO 8601, 'YYYY-MM-DD'
     today = datetime.date.today().isoformat()
     
-    fecha = strftime("%Y%m%d%H%M%S",gmtime())
-    error_file_name = './error/'+fecha+'.txt'
-    exito_file_name = './exito/'+fecha+'.txt'
+    fecha = datetime.datetime.today().strftime("%Y%m%d-%H-%M")
+    error_file_name = './error/calculo-RFM-'+fecha+'.txt'
+    exito_file_name = './exito/calculo-RFM-'+fecha+'.txt'
     
     # Me conecto
     db, cursor = conectar()
@@ -222,6 +222,7 @@ def update():
         elif (clientes_frecuencia[key] < 1):
             valor = 1
         
+        clientes_frecuencia[key] = valor
         if valor > 2:
             print 'Frecuencia de %s = %s - Score = %s'%(key,clientes_frecuencia[key], valor )
             if DEBUG:
@@ -229,7 +230,7 @@ def update():
                 if out != '' and out[0]=='s':
                     DEBUG = False
                 
-        clientes_frecuencia[key] = valor
+        
     
     
     # -------------- Actualizacion de tipo de clientes --------------
@@ -258,7 +259,7 @@ def update():
     count = 0
     id_null = 0
     print "Cantidad de contactos seleccionados = ",len(contactos)
-    return
+    
     for contacto in contactos:
         
         id = contacto[0]
@@ -344,8 +345,8 @@ def update():
         
         # logeo la actualizacion
         print 'Actualizando contacto ',count
-        if count > TEST_AMOUNT:
-            print 'Test end....Bye!'
+        #if count > TEST_AMOUNT:
+        #    print 'Test end....Bye!'
             #return
             #sys.exit(0)
         #continue

@@ -9,6 +9,8 @@ USER = 'rcastro'
 PASS = 'hometrix'
 DATABASE = 'sugarcrm'
 
+DEBUGG = True
+
 
 def ensure_dir(f):
     # Obtengo la ruta de directorios
@@ -38,6 +40,7 @@ def procesar(pathname):
     arch_datos = open(pathname)
     lineas = arch_datos.readlines()
     
+    DEBUGG = raw_input('Correr en modo DEBUGG? (s/n)\nNo se efectuan cambios en la base.\n')[0] == 's'
     # Archivos de log
     fecha = datetime.datetime.today().strftime("%Y%m%d-%H-%M")
     file_error = open(ensure_dir('./error/clientes/log-error-clientes-especiales-%s.txt'%(fecha)),'w')
@@ -65,9 +68,13 @@ def procesar(pathname):
         
         resultado=cursor.fetchall()
         ERROR = True
+        
+        # Chequeo que haya un contacto con el id = id_maipu
         if len(resultado) == 1 :
             ERROR = False
+            # Obtengo el contacto
             cliente= resultado[0]
+            # Obtengo el id de Sugar de ese contacto
             id_cliente = cliente[0]
             clientes_existentes += 1 
             sql = 'UPDATE contacts_cstm SET tipo_cliente_c = \'%s\' WHERE id_c = \'%s\''%(tipo, id_cliente )
@@ -90,10 +97,14 @@ def procesar(pathname):
             continue
         
         # debug
-        print sql
-        continue
+        if DEBUGG:
+            print "-"*10+"MODO DEBUG "+"-"*10
+            print sql
+            continue
+        
         
         try:
+            # Actualizo la base
             cursor.execute(sql)
             # Hago un commit del cambio en la base
             db.commit()

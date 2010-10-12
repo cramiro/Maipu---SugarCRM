@@ -1,49 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import MySQLdb
 from geopy import geocoders
 import datetime
 import time
 import random
-import os
-
-SERVER = 'sugarcrm.amaipu.com.ar'
-USER = 'rcastro'
-PASS = 'hometrix'
-DATABASE = 'sugarcrm'
+import util
 
 COLON_4045 = (-31.3983531 , -64.2331642)
-
-def ensure_dir(f):
-    # Obtengo la ruta de directorios
-    dirs = os.path.dirname(f)
-    
-    # Chequeo que la ruta exista
-    if not os.path.exists(dirs):
-        # Si no existe, la creo
-        print 'Creando path: ',dirs
-        os.makedirs(dirs)
-    return f
-
-def conectar(server=None, user=None, p=None, db=None):
-    global SERVER, USER, DATABASE, PASS
-    print 'Conectando a la base %s@%s  - DB: %s ...'%(USER, SERVER,DATABASE)
-    db = MySQLdb.connect(SERVER,USER,PASS,DATABASE,use_unicode=True)
-    db.set_character_set('utf8')
-    #print 'Conexion exitosa!'
-    # Preparo el objeto cursor
-    return db, db.cursor()
-
 
 def procesar():
 
     g = geocoders.Google('ABQIAAAAtGLFHYz6bfKeWA7GGQ8fzRSfYWwldeQTn-MMsG6oDuo7Kf7ifBSD9Yv-SCgMoxscszNjCTLqX9vU2g')
     # Me conecto
-    db, cursor = conectar()
+    db, cursor = util.conectar()
     
     fecha = datetime.datetime.today().strftime("%Y%m%d-%H-%M")
-    file_error = open(ensure_dir('./error/geocoders/log-error-geocoder-%s.txt'%(fecha)),'w')
-    file_exito = open(ensure_dir('./exito/geocoders/log-exito-geocoder-%s.txt'%(fecha) ),'w')
+    file_error = open(util.ensure_dir('./error/geocoders/log-error-geocoder-%s.txt'%(fecha)),'w')
+    file_exito = open(util.ensure_dir('./exito/geocoders/log-exito-geocoder-%s.txt'%(fecha) ),'w')
     file_etapa = open('log-etapa-geocoder.txt', 'a')
     
     etapa = '2010-06%'
@@ -71,6 +44,7 @@ def procesar():
     # Obtengo el resultado de la consulta
     datos = cursor.fetchall()
     
+    # Inicializo contadores
     count_ok = 0
     count_default = 0
     count_not_cordoba = 0
@@ -84,12 +58,11 @@ def procesar():
         iter += 1
         id_contacto = dato[0]
         
-        # Si 'estado_localizacion_c' != 'OK' armo direccion
-        # y trato de geolocalizar
         sql = "\
         SELECT \
             contacts.primary_address_street , IFNULL(IF(contacts_cstm.domicilio_uno_numero_c REGEXP '^[0-9]+' = 0, -1, contacts_cstm.domicilio_uno_numero_c), -1) AS altura,\
-             IFNULL(contacts.primary_address_city , 'NO-CITY' )AS ciudad, contacts_cstm.estado_localizacion_c AS estado \
+             IFNULL(contacts.primary_address_city , 'NO-CITY' ) AS ciudad, contacts_cstm.estado_localizacion_c AS estado, \
+            IFNULL(contacts.primary_address_state  , 'NO-STATE' ) AS provincia\
         FROM contacts, contacts_cstm \
         WHERE \
             contacts.deleted=0 AND contacts.id = '"+str(id_contacto)+"' AND contacts.id=contacts_cstm.id_c "
@@ -110,10 +83,16 @@ def procesar():
             
             # Chequeo que la ciudad sea CORDOBA
             ciudad = (direccion[2].split('(')[0].strip()).replace(u'\xd1', 'N').replace(u'\xf1','n')
-            
-            if (ciudad.upper() == 'NO-CITY' ):#or ciudad.upper() != 'CORDOBA'):
+            provincia = (direccion[4].strip()).replace(u'\xd1', 'N').replace(u'\xf1','n')
+
+            if (ciudad.upper() == 'NO-CITY' ) or (ciudad.upper() != 'CORDOBA'):
                 count_not_cordoba += 1
                 continue
+            
+            if (provincia.upper() == 'NO-STATE' ):
+                #count_not_cordoba += 1
+                provincia = ""
+                #continue
             
             # Chequeo que el estado sea distinto de OK o DEFAULT
             estado = direccion[-1]
@@ -133,19 +112,18 @@ def procesar():
                 calle = "Av. Colon"
                 altura = 4045
             
-            provincia = ciudad
             pais = "Argentina"
             
             # Genero un tiempo de espera aleatorio
             sleep_time = random.randint(0,30)
-            print "BUSCO: %s %s, %s, %s"%(calle, altura, ciudad, pais) 
+            print "BUSCO: %s %s, %s, %s, %s"%(calle, altura, provincia, ciudad, pais) 
             print "ANALIZADOS %s REGISTROS DE %s. SLEEPING %s seconds."%(iter, len(datos), sleep_time)
             
             time.sleep(sleep_time)
             
             # Intento obtener localizacion de la direccion en (lat, long)
             try:
-                place, (lat, long) = g.geocode( "%s %s, %s, %s"%(calle, altura, ciudad, pais) )
+                place, (lat, long) = g.geocode( "%s %s, %s, %s, %s"%(calle, altura, provincia, ciudad, pais) )
                 estado_localizacion = 'OK'
                 count_ok += 1
             except Exception, e:
@@ -156,10 +134,11 @@ def procesar():
                 place, (lat, long) = "Av. Colon 4045", COLON_4045
                 estado_localizacion = 'DEFAULT'
                 count_default +=1
-                file_error.write('Error: geocode: %s for ID=%s - Dir: %s\n - Estado: %s'%(e, id_contacto, ', '.join([calle.encode('ascii', 'replace'),str(altura),ciudad,pais]), estado_localizacion ))
+                file_error.write('Error: geocode: %s for ID=%s - Dir: %s\n - Estado: %s'%(e, id_contacto, ', '.join([calle.encode('ascii', 'replace'),str(altura),ciudad, provincia, pais]), estado_localizacion ))
                 
             # Si encontro Cordoba o un lugar fuera de Cordoba, seteo COLON 4045
-            if place == u'C\xf3rdoba, Cordoba, Argentina' or u'C\xf3rdoba, Cordoba, Argentina' not in place:
+            
+            if 'CORDOBA' == ciudad and place == u'C\xf3rdoba, Cordoba, Argentina' or u'C\xf3rdoba, Cordoba, Argentina' not in place:
                 print 'Place not found!...searching new address'
                 place, (lat, long) = "Av. Colon 4045", COLON_4045
                 estado_localizacion = 'DEFAULT'
