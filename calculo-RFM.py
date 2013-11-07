@@ -8,6 +8,7 @@ import sets
 TEST_AMOUNT = 50
 DEBUG = True
 
+# testing
 SERVER = 'sugarcrm.amaipu.com.ar'
 USER = 'rcastro'
 PASS = 'hometrix'
@@ -18,7 +19,6 @@ def conectar(server=None, user=None, p=None, db=None):
     global SERVER, USER, DATABASE, PASS
     print 'Conectando a la base %s@%s  - DB: %s ...'%(USER, SERVER,DATABASE)
     db = MySQLdb.connect(SERVER,USER,PASS,DATABASE)
-    #print 'Conexion exitosa!'
     # Preparo el objeto cursor
     return db, db.cursor()
 
